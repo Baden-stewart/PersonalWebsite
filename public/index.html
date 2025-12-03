@@ -1,5 +1,437 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentiment Analyzer</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script type="module">
+        import * as transformers from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.1.2';
+        window.transformers = transformers;
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-<p>hello</p>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #03fe31 0%, #fe0303 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        #root {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h1 {
+			text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2.5rem;
+        }
+
+        .input-section {
+            margin-bottom: 25px;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 150px;
+            padding: 15px;
+            font-size: 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            resize: vertical;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            flex: 1;
+            min-width: 120px;
+            padding: 15px 30px;
+            font-size: 16px;
+            font-weight: 600;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .analyze-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .analyze-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .analyze-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .clear-btn {
+            background: #f5f5f5;
+            color: #666;
+        }
+
+        .clear-btn:hover {
+            background: #e0e0e0;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 15px;
+            padding: 30px;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .sentiment-label {
+            text-align: center;
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .score-display {
+            text-align: center;
+            font-size: 1.5rem;
+            margin-bottom: 25px;
+            color: #555;
+        }
+
+        .visualization {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            font-size: 3rem;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .confidence-bar {
+            width: 100%;
+            height: 30px;
+            background: #e0e0e0;
+            border-radius: 15px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            transition: width 0.5s ease-out;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .positive-fill {
+            background: linear-gradient(90deg, #11998e 0%, #38ef7d 100%);
+        }
+
+        .negative-fill {
+            background: linear-gradient(90deg, #eb3349 0%, #f45c43 100%);
+        }
+
+        .model-status {
+            text-align: center;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .model-loading {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .model-ready {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .container {
+                padding: 25px;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+
+            button {
+                width: 100%;
+            }
+
+            .visualization {
+                font-size: 2.5rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 10px;
+            }
+
+            .container {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 1.75rem;
+            }
+
+            textarea {
+                min-height: 120px;
+            }
+
+            .sentiment-label {
+                font-size: 1.5rem;
+            }
+
+            .score-display {
+                font-size: 1.2rem;
+            }
+
+            .visualization {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        function SentimentAnalyzer() {
+            const [text, setText] = useState('');
+            const [result, setResult] = useState(null);
+            const [isLoading, setIsLoading] = useState(false);
+            const [modelReady, setModelReady] = useState(false);
+            const [modelLoading, setModelLoading] = useState(true);
+            const pipelineRef = useRef(null);
+
+            useEffect(() => {
+                async function loadModel() {
+                    try {
+                        setModelLoading(true);
+                        
+                        // Wait for the transformers library to be available
+                        while (!window.transformers) {
+                            await new Promise(resolve => setTimeout(resolve, 100));
+                        }
+                        
+                        const { pipeline } = window.transformers;
+                        pipelineRef.current = await pipeline(
+                            'sentiment-analysis',
+                            'Xenova/distilbert-base-uncased-finetuned-sst-2-english'
+                        );
+                        setModelReady(true);
+                        setModelLoading(false);
+                    } catch (error) {
+                        console.error('Error loading model:', error);
+                        setModelLoading(false);
+                        // Allow typing even if model fails to load
+                        setModelReady(true);
+                    }
+                }
+                loadModel();
+            }, []);
+
+            const analyzeSentiment = async () => {
+                if (!text.trim() || !pipelineRef.current) return;
+
+                setIsLoading(true);
+                setResult(null);
+
+                try {
+                    const output = await pipelineRef.current(text);
+                    setResult(output[0]);
+                } catch (error) {
+                    console.error('Error analyzing sentiment:', error);
+                    alert('An error occurred during analysis. Please try again.');
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            const clearAll = () => {
+                setText('');
+                setResult(null);
+            };
+
+            const getVisualization = (label, score) => {
+                const intensity = Math.floor(score * 5);
+                if (label === 'POSITIVE') {
+                    return '😎'.repeat(intensity);
+                } else {
+                    return '🌶️'.repeat(intensity);
+                }
+            };
+
+            return (
+                <div className="container">
+                    <h1>🎭 Sentiment Analyzer</h1>
+
+                    {modelLoading && (
+                        <div className="model-status model-loading">
+                            ⏳ Loading AI model... This may take a moment on first load.
+                        </div>
+                    )}
+
+                    {modelReady && (
+                        <div className="model-status model-ready">
+                            ✅ Model ready! Enter text to analyze sentiment.
+                        </div>
+                    )}
+
+                    <div className="input-section">
+                        <textarea
+                            value={text}
+                            onChange={(e) => setText(e.target.value)}
+                            placeholder="Enter text to analyze sentiment... Try something positive or negative!"
+                            disabled={!modelReady}
+                        />
+                    </div>
+
+                    <div className="button-group">
+                        <button
+                            className="analyze-btn"
+                            onClick={analyzeSentiment}
+                            disabled={!text.trim() || isLoading || !modelReady}
+                        >
+                            {isLoading ? 'Analyzing...' : 'Analyze'}
+                        </button>
+                        <button
+                            className="clear-btn"
+                            onClick={clearAll}
+                            disabled={isLoading}
+                        >
+                            Clear
+                        </button>
+                    </div>
+
+                    {isLoading && (
+                        <div className="loading">
+                            <div className="spinner"></div>
+                            <p>Analyzing sentiment...</p>
+                        </div>
+                    )}
+
+                    {result && !isLoading && (
+                        <div className="results">
+                            <div className="sentiment-label">
+                                {result.label === 'POSITIVE' ? '😊 Positive' : '😞 Negative'}
+                            </div>
+                            
+                            <div className="score-display">
+                                Score: {result.score.toFixed(4)}
+                            </div>
+
+                            <div className="visualization">
+                                {getVisualization(result.label, result.score)}
+                            </div>
+
+                            <div className="confidence-bar">
+                                <div
+                                    className={`confidence-fill ${result.label === 'POSITIVE' ? 'positive-fill' : 'negative-fill'}`}
+                                    style={{ width: `${result.score * 100}%` }}
+                                >
+                                    {(result.score * 100).toFixed(1)}% Confidence
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        ReactDOM.render(<SentimentAnalyzer />, document.getElementById('root'));
+    </script>
+</body>
 </html>
-
